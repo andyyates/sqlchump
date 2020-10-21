@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import time
 import pdb
-import pickle
+import json
 import os
 import gi
 gi.require_version('Gtk', '3.0')
@@ -12,6 +12,7 @@ from string import Template
 import re
 import datetime
 import sys
+gi.require_version('GtkSource', '4')
 from gi.repository import GtkSource
 
 def show_error_dlg(error_string):
@@ -136,13 +137,13 @@ class ConnSetup:
     def __init__(self):     
         self.password_names = ["password","passwd"]
         self.drop_down_options = []        
-        self.window=Gtk.Window(Gtk.WindowType.TOPLEVEL)
+        self.window=Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
         self.window.connect("destroy", self.destroy)
         self.window.set_icon_from_file(icondir + "tray-connecting.png")
         self.accel_group = Gtk.AccelGroup()
         self.window.add_accel_group(self.accel_group)
-        self.table = Gtk.Table(rows=20, columns=10, homogeneous=False) 
-        ip = Gtk.Button("Connect")
+        self.table = Gtk.Table(n_rows=20, n_columns=10, homogeneous=False) 
+        ip = Gtk.Button(label="Connect")
         self.table.attach(ip,1,3,9,10)
         ip.connect("clicked", self.on_connect)
         key,mod = Gtk.accelerator_parse("Return")
@@ -155,7 +156,7 @@ class ConnSetup:
         self.table.attach(self.error_log,1,3,10,11)
         
         lbl = Gtk.Label(label="Connection type")
-        lbl.set_alignment(1,0.5)
+        #lbl.set_alignment(1,0.5) -depracated 
         self.table.attach(lbl,0,1,1,2,xpadding=10)
         self.dbtype_combo = Gtk.ComboBoxText()
         self.table.attach(self.dbtype_combo,1,2,1,2)
@@ -192,8 +193,8 @@ class ConnSetup:
         i = 2
         self.ip_fields = {}        
         for key in fields:
-            lbl = Gtk.Label(key.replace("_"," "))
-            lbl.set_alignment(1,0.5)
+            lbl = Gtk.Label(label=key.replace("_"," "))
+            #lbl.set_alignment(1,0.5) - depractated
             table.attach(lbl,0,1,i,i+1,xpadding=10)
             ip = Gtk.Entry()
             table.attach(ip,1,2,i,i+1)
@@ -241,8 +242,9 @@ class ConnSetup:
         prefs = None
         if os.path.exists(prefsFile):
             f = open(prefsFile,"r")
+            fc = f.read()
             try:
-                prefs = pickle.load(f)
+                prefs = json.loads(fc)
             except:
                 self.tell_user("error loading connection prefs file")
             f.close()
@@ -278,7 +280,7 @@ class ConnSetup:
             prefs["saved_conn"].append(t)
         prefs["last_used"] = self.dbtype_combo.get_active()
         f = open(prefsFile,"w")
-        pickle.dump(prefs,f)
+        f.write(json.dumps(prefs))
         f.close()
         
     def main(self):
@@ -470,9 +472,9 @@ class QueryW():
         savebutton.set_relief(Gtk.ReliefStyle.NONE)
 
 
-        box.pack_start(self.label, True, True)
-        box.pack_end(savebutton, False, False)
-        box.pack_end(closebtn, False, False)
+        box.pack_start(self.label, True, True, 0)
+        box.pack_end(savebutton, False, False, 0)
+        box.pack_end(closebtn, False, False, 0)
         box.show_all()
         savebutton.hide()
         self.savebutton = savebutton
@@ -534,7 +536,7 @@ class QueryW():
         self.result_win = Gtk.ScrolledWindow()
         self.result_win.set_policy(Gtk.PolicyType.AUTOMATIC,Gtk.PolicyType.AUTOMATIC)
         paned.pack2(self.result_win,True)
-        rbox = Gtk.VBox(False,1)
+        rbox = Gtk.VBox(homogeneous=False,spacing=1)
         self.result_win.add_with_viewport(rbox)
         paned.show_all()
         self.textview.grab_focus()
@@ -579,12 +581,12 @@ class QueryW():
         return response
 
     def get_query_text(self):
-        return self.textbuffer.get_text(self.textbuffer.get_start_iter(),self.textbuffer.get_end_iter())
+        return self.textbuffer.get_text(self.textbuffer.get_start_iter(),self.textbuffer.get_end_iter(), 0)
 
     def get_selected_query_text(self):
         r = self.textbuffer.get_selection_bounds()
         if r:
-            return self.textbuffer.get_text(r[0],r[1])            
+            return self.textbuffer.get_text(r[0],r[1], 0)
 
     def open_value_for_edit(self,widget,data=None):
         print (data)
@@ -667,7 +669,7 @@ class TableBrowser:
         tvcol = Gtk.TreeViewColumn()
         self.treeview.append_column(tvcol)
         render_pixbuf = Gtk.CellRendererPixbuf()
-        tvcol.pack_start(render_pixbuf, False, True, 0)
+        tvcol.pack_start(render_pixbuf, False)
         tvcol.add_attribute(render_pixbuf, 'pixbuf', 0)        
         i = 1
         tvcol = Gtk.TreeViewColumn("table")
@@ -743,7 +745,7 @@ class MainProg:
         self.db = db      
         self.ui = Gtk.Builder()
         self.ui.add_from_file(scriptdir+'query.glade')
-        self.ui.signal_autoconnect({
+        self.ui.connect_signals({
                 "do_quit": self.app_close,
                 "on_quit1_activate" : self.app_close,
                 "on_run_query_activate" : self.app_func("run_query"),
@@ -758,18 +760,18 @@ class MainProg:
                 "on_copy1_activate" : self.copy,
                 "on_paste1_activate" : self.paste 
                 })
-        self.window = self.ui.get_widget("window1")
+        self.window = self.ui.get_object("window1")
         self.window.set_icon_from_file(icondir+"db.png")
-        self.notebook = self.ui.get_widget("notebook1")
-        self.messages = self.ui.get_widget("messages")        
+        self.notebook = self.ui.get_object("notebook1")
+        self.messages = self.ui.get_object("messages")        
         self.apps = []
         self.conn = self.db.connect()
         self.new_page()
         self.message("Connected")
         self.clip = Gtk.Clipboard()
         self.table_browser = TableBrowser(
-            self.ui.get_widget("treeview_tables"),
-            self.ui.get_widget("table_browser_filter"),
+            self.ui.get_object("treeview_tables"),
+            self.ui.get_object("table_browser_filter"),
             self)
         self.update_window_title()
 
@@ -816,7 +818,7 @@ class MainProg:
         msg2 = msg2.strip()
         msg2 = "* " + msg2
         buf = self.messages.get_buffer()
-        t = buf.get_text(buf.get_start_iter(),buf.get_end_iter())
+        t = buf.get_text(buf.get_start_iter(),buf.get_end_iter(), 0)
         buf.set_text(t + "\n" + msg2)
         buf.place_cursor(buf.get_end_iter()) 
         self.messages.scroll_mark_onscreen(buf.get_mark("insert"))
